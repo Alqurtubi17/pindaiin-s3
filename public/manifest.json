@@ -1,0 +1,19 @@
+{
+  "name": "Pindaiin — Pendamping Digital & Adopsi QRIS UMKM",
+  "short_name": "Pindaiin",
+  "description": "Aplikasi edukasi, misi, dan aktivitas QRIS untuk UMKM di Jawa Timur.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
