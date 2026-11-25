@@ -26,7 +26,7 @@ export function getSmtpConfig(): SmtpConfig {
   const secure = process.env.SMTP_SECURE === 'true' || port === 465;
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
-  const from = process.env.SMTP_FROM || 'DigiUMKM <noreply@digiumkm.id>';
+  const from = process.env.SMTP_FROM || 'Pindaiin <noreply@pindaiin.id>';
 
   return { host, port, secure, user, pass, from };
 }
@@ -96,19 +96,19 @@ export async function sendOtpEmail({
 
   const isRegistration = purpose === 'register';
   const subject = isRegistration
-    ? `[DigiUMKM] Kode Verifikasi Pendaftaran: ${otp}`
-    : `[DigiUMKM] Kode Verifikasi Reset Kata Sandi: ${otp}`;
+    ? `[Pindaiin] Kode Verifikasi Pendaftaran: ${otp}`
+    : `[Pindaiin] Kode Verifikasi Reset Kata Sandi: ${otp}`;
 
   const greeting = recipientName ? `Halo Bapak/Ibu <strong>${recipientName}</strong>,` : 'Halo Mitra UMKM,';
   const actionText = isRegistration
-    ? 'Gunakan kode verifikasi (OTP) di bawah ini untuk menyelesaikan pendaftaran akun toko Anda di platform DigiUMKM:'
-    : 'Kami menerima permintaan untuk mereset kata sandi akun DigiUMKM Anda. Masukkan kode OTP berikut untuk melanjutkan:';
+    ? 'Gunakan kode verifikasi (OTP) di bawah ini untuk menyelesaikan pendaftaran akun toko Anda di platform Pindaiin:'
+    : 'Kami menerima permintaan untuk mereset kata sandi akun Pindaiin Anda. Masukkan kode OTP berikut untuk melanjutkan:';
 
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <div style="display: inline-block; width: 44px; height: 44px; background-color: #0284c7; border-radius: 12px; color: #ffffff; font-size: 20px; font-weight: bold; line-height: 44px; text-align: center;">DU</div>
-        <h2 style="color: #0f172a; margin: 12px 0 4px 0; font-size: 20px; font-weight: 800;">DigiUMKM</h2>
+        <div style="display: inline-block; width: 44px; height: 44px; background-color: #0284c7; border-radius: 12px; color: #ffffff; font-size: 20px; font-weight: bold; line-height: 44px; text-align: center;">P</div>
+        <h2 style="color: #0f172a; margin: 12px 0 4px 0; font-size: 20px; font-weight: 800;">Pindai<span style="color: #0284c7;">in</span></h2>
         <p style="color: #64748b; font-size: 12px; margin: 0;">Pendamping Digital & Adopsi QRIS untuk UMKM</p>
       </div>
 
@@ -129,7 +129,7 @@ export async function sendOtpEmail({
       </div>
 
       <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8;">
-        &copy; 2026 DigiUMKM • Inisiatif Digitalisasi QRIS UMKM Jawa Timur
+        &copy; 2026 Pindaiin • Inisiatif Digitalisasi QRIS UMKM Jawa Timur
       </div>
     </div>
   `;
@@ -173,7 +173,7 @@ export async function sendOtpEmail({
       to: normalizedEmail,
       subject,
       html: htmlContent,
-      text: `Kode verifikasi DigiUMKM Anda adalah: ${otp}. Berlaku selama 5 menit.`,
+      text: `Kode verifikasi Pindaiin Anda adalah: ${otp}. Berlaku selama 5 menit.`,
     });
 
     return {
@@ -189,6 +189,152 @@ export async function sendOtpEmail({
       simulated: true,
       otp,
       message: `Gagal menghubungi server SMTP Gmail, beralih ke kode darurat: ${otp}`,
+    };
+  }
+}
+
+interface ResetTokenEntry {
+  email: string;
+  expiresAt: number;
+}
+
+const resetTokenStore = new Map<string, ResetTokenEntry>();
+
+export function createPasswordResetToken(email: string): string {
+  const normalizedEmail = email.toLowerCase().trim();
+  const token = crypto.randomUUID();
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 menit
+  resetTokenStore.set(token, { email: normalizedEmail, expiresAt });
+  return token;
+}
+
+export function verifyPasswordResetToken(token: string): {
+  valid: boolean;
+  email?: string;
+  message: string;
+} {
+  const trimmed = token.trim();
+  const entry = resetTokenStore.get(trimmed);
+
+  if (!entry) {
+    return {
+      valid: false,
+      message: 'Tautan reset kata sandi tidak valid atau sudah digunakan.',
+    };
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    resetTokenStore.delete(trimmed);
+    return {
+      valid: false,
+      message: 'Tautan reset kata sandi sudah kedaluwarsa. Silakan minta tautan baru.',
+    };
+  }
+
+  // Hapus setelah dipakai untuk mencegah replay
+  resetTokenStore.delete(trimmed);
+  return {
+    valid: true,
+    email: entry.email,
+    message: 'Token reset kata sandi valid.',
+  };
+}
+
+/**
+ * Kirim email berisi tautan reset kata sandi
+ */
+export async function sendPasswordResetLinkEmail({
+  to,
+  resetUrl,
+}: {
+  to: string;
+  resetUrl: string;
+}): Promise<{ success: boolean; simulated: boolean; message: string; resetUrl?: string }> {
+  const config = getSmtpConfig();
+  const normalizedEmail = to.toLowerCase().trim();
+  const hasRealSmtp = Boolean(config.user && config.pass);
+
+  if (!hasRealSmtp) {
+    console.log(`\n======================================================`);
+    console.log(`[MODE SIMULASI / DEV SMTP]`);
+    console.log(`Tujuan Email: ${normalizedEmail}`);
+    console.log(`Tautan Reset Sandi: ${resetUrl}`);
+    console.log(`======================================================\n`);
+
+    return {
+      success: true,
+      simulated: true,
+      resetUrl,
+      message: `Tautan reset kata sandi telah dibuat untuk ${normalizedEmail}.`,
+    };
+  }
+
+  const subject = '[Pindaiin] Tautan Atur Ulang Kata Sandi';
+  const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #0f172a; margin: 0 0 4px 0; font-size: 20px; font-weight: 800;">Pindai<span style="color: #0284c7;">in</span></h2>
+        <p style="color: #64748b; font-size: 12px; margin: 0;">Pendamping Digital & Adopsi QRIS untuk UMKM</p>
+      </div>
+
+      <div style="background-color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #cbd5e1;">
+        <p style="color: #334155; font-size: 14px; margin-top: 0;">Halo Mitra UMKM,</p>
+        <p style="color: #475569; font-size: 13px; line-height: 1.5;">
+          Kami menerima permintaan untuk mengatur ulang kata sandi akun Pindaiin Anda. Klik tombol di bawah ini untuk membuat kata sandi baru:
+        </p>
+
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0284c7; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 10px;">
+            Atur Ulang Kata Sandi
+          </a>
+        </div>
+
+        <p style="color: #64748b; font-size: 12px; line-height: 1.5;">
+          Tautan ini berlaku selama <strong>15 menit</strong> dan hanya dapat digunakan satu kali. Jika tombol tidak berfungsi, salin tautan berikut ke browser Anda:
+        </p>
+        <p style="word-break: break-all; font-size: 11px; color: #0284c7;">${resetUrl}</p>
+      </div>
+
+      <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8;">
+        &copy; 2026 Pindaiin
+      </div>
+    </div>
+  `;
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: {
+        user: config.user,
+        pass: config.pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    await transporter.sendMail({
+      from: config.from,
+      to: normalizedEmail,
+      subject,
+      html: htmlContent,
+      text: `Atur ulang kata sandi Pindaiin Anda melalui tautan berikut (berlaku 15 menit): ${resetUrl}`,
+    });
+
+    return {
+      success: true,
+      simulated: false,
+      message: `Tautan atur ulang kata sandi telah dikirim ke email ${normalizedEmail}.`,
+    };
+  } catch (err) {
+    console.error('SMTP sendPasswordResetLinkEmail error:', err);
+    return {
+      success: true,
+      simulated: true,
+      resetUrl,
+      message: `Gagal menghubungi server SMTP, gunakan tautan reset sementara berikut.`,
     };
   }
 }

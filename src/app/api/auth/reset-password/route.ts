@@ -1,28 +1,27 @@
 // src/app/api/auth/reset-password/route.ts
 import { NextResponse } from 'next/server';
-import { verifyStoredOtp } from '@/lib/email/smtp.service';
+import { z } from 'zod';
+import { verifyPasswordResetToken } from '@/lib/email/smtp.service';
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token reset wajib diisi'),
+  newPassword: z.string().min(6, 'Kata sandi baru minimal 6 karakter'),
+});
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, otp, newPassword } = body;
+    const parsed = resetPasswordSchema.safeParse(body);
 
-    if (!email || !otp || !newPassword) {
+    if (!parsed.success) {
+      const firstError = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
       return NextResponse.json(
-        { success: false, message: 'Email, kode OTP, dan kata sandi baru wajib diisi.' },
+        { success: false, message: firstError || 'Data reset kata sandi tidak valid.' },
         { status: 400 }
       );
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { success: false, message: 'Kata sandi baru minimal 6 karakter.' },
-        { status: 400 }
-      );
-    }
-
-    // Verifikasi OTP
-    const verification = verifyStoredOtp(email, otp, 'reset-password');
+    const verification = verifyPasswordResetToken(parsed.data.token);
     if (!verification.valid) {
       return NextResponse.json(
         { success: false, message: verification.message },
@@ -30,9 +29,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Password reset verified successfully
     return NextResponse.json({
       success: true,
+      email: verification.email,
       message: 'Kata sandi berhasil diatur ulang. Silakan masuk menggunakan kata sandi baru Anda.',
     });
   } catch (error) {
@@ -43,4 +42,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
