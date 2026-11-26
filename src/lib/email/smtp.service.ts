@@ -1,5 +1,7 @@
 // src/lib/email/smtp.service.ts
 import nodemailer from 'nodemailer';
+import path from 'path';
+import fs from 'fs';
 
 /**
  * Konfigurasi Google / Gmail SMTP
@@ -104,11 +106,17 @@ export async function sendOtpEmail({
     ? 'Gunakan kode verifikasi (OTP) di bawah ini untuk menyelesaikan pendaftaran akun toko Anda di platform Pindaiin:'
     : 'Kami menerima permintaan untuk mereset kata sandi akun Pindaiin Anda. Masukkan kode OTP berikut untuk melanjutkan:';
 
+  const logoPath = path.join(process.cwd(), 'public', 'icons', 'logo-email.png');
+  const hasLogo = fs.existsSync(logoPath);
+  const logoHtml = hasLogo
+    ? `<img src="cid:pindaiin-logo" alt="Pindaiin" width="48" height="48" style="display: block; margin: 0 auto 12px auto; border-radius: 12px;" />`
+    : `<div style="display: inline-block; width: 44px; height: 44px; background-color: #0284c7; border-radius: 12px; color: #ffffff; font-size: 20px; font-weight: bold; line-height: 44px; text-align: center;">P</div>`;
+
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <div style="display: inline-block; width: 44px; height: 44px; background-color: #0284c7; border-radius: 12px; color: #ffffff; font-size: 20px; font-weight: bold; line-height: 44px; text-align: center;">P</div>
-        <h2 style="color: #0f172a; margin: 12px 0 4px 0; font-size: 20px; font-weight: 800;">Pindai<span style="color: #0284c7;">in</span></h2>
+        ${logoHtml}
+        <h2 style="color: #0f172a; margin: 0 0 4px 0; font-size: 20px; font-weight: 800;">Pindai<span style="color: #0284c7;">in</span></h2>
         <p style="color: #64748b; font-size: 12px; margin: 0;">Pendamping Digital & Adopsi QRIS untuk UMKM</p>
       </div>
 
@@ -174,6 +182,9 @@ export async function sendOtpEmail({
       subject,
       html: htmlContent,
       text: `Kode verifikasi Pindaiin Anda adalah: ${otp}. Berlaku selama 5 menit.`,
+      attachments: hasLogo
+        ? [{ filename: 'logo.png', path: logoPath, cid: 'pindaiin-logo' }]
+        : [],
     });
 
     return {
@@ -269,10 +280,17 @@ export async function sendPasswordResetLinkEmail({
     };
   }
 
+  const logoPath = path.join(process.cwd(), 'public', 'icons', 'logo-email.png');
+  const hasLogo = fs.existsSync(logoPath);
+  const logoHtml = hasLogo
+    ? `<img src="cid:pindaiin-logo" alt="Pindaiin" width="48" height="48" style="display: block; margin: 0 auto 12px auto; border-radius: 12px;" />`
+    : '';
+
   const subject = '[Pindaiin] Tautan Atur Ulang Kata Sandi';
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
       <div style="text-align: center; margin-bottom: 24px;">
+        ${logoHtml}
         <h2 style="color: #0f172a; margin: 0 0 4px 0; font-size: 20px; font-weight: 800;">Pindai<span style="color: #0284c7;">in</span></h2>
         <p style="color: #64748b; font-size: 12px; margin: 0;">Pendamping Digital & Adopsi QRIS untuk UMKM</p>
       </div>
@@ -321,6 +339,9 @@ export async function sendPasswordResetLinkEmail({
       subject,
       html: htmlContent,
       text: `Atur ulang kata sandi Pindaiin Anda melalui tautan berikut (berlaku 15 menit): ${resetUrl}`,
+      attachments: hasLogo
+        ? [{ filename: 'logo.png', path: logoPath, cid: 'pindaiin-logo' }]
+        : [],
     });
 
     return {

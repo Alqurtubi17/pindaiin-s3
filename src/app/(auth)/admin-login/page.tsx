@@ -7,6 +7,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { usePageTitle } from '@/lib/utils/use-page-title';
+import { setAdminSession } from '@/modules/auth/admin-session';
 
 export default function AdminLoginPage() {
   usePageTitle('Masuk Pengelola');
@@ -23,14 +24,14 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     setErrorMsg(null);
 
-    setTimeout(() => {
+    if (email.trim() && password.length >= 6) {
+      setAdminSession(email.trim());
       setIsLoading(false);
-      if (email.trim() && password.length >= 6) {
-        router.push('/admin/verification');
-      } else {
-        setErrorMsg('Email atau kata sandi pengelola tidak valid.');
-      }
-    }, 350);
+      router.push('/admin/verification');
+    } else {
+      setIsLoading(false);
+      setErrorMsg('Email atau kata sandi pengelola tidak valid.');
+    }
   };
 
   return (
@@ -59,7 +60,7 @@ export default function AdminLoginPage() {
             <input
               type="email"
               required
-              placeholder="admin@digiumkm.id"
+              placeholder="admin@pindaiin.id"
               className="w-full h-10 pl-10 pr-3.5 text-xs bg-slate-50/70 border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

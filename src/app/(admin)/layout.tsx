@@ -1,7 +1,7 @@
 // src/app/(admin)/layout.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -17,11 +17,35 @@ import {
 import { clsx } from 'clsx';
 import { BrandLogo } from '@/components/ui/brand-logo';
 import { activateAdminDemoMerchantSession } from '@/modules/auth/merchant-session';
+import { getAdminSession, clearAdminSession, AdminSession } from '@/modules/auth/admin-session';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [adminSession, setAdminSessionState] = useState<AdminSession | null>(null);
+
+  useEffect(() => {
+    const syncAdminSession = () => {
+      const current = getAdminSession();
+      setAdminSessionState(current);
+      if (!current) {
+        router.replace('/admin-login');
+      }
+    };
+
+    syncAdminSession();
+    window.addEventListener('storage', syncAdminSession);
+    window.addEventListener('pindaiin_admin_session_updated', syncAdminSession);
+    return () => {
+      window.removeEventListener('storage', syncAdminSession);
+      window.removeEventListener('pindaiin_admin_session_updated', syncAdminSession);
+    };
+  }, [router]);
+
+  if (!adminSession) {
+    return null;
+  }
 
   const navLinks = [
     {
@@ -50,6 +74,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setMobileMenuOpen(false);
     activateAdminDemoMerchantSession();
     router.push('/dashboard');
+  };
+
+  const handleLogoutAdmin = () => {
+    setMobileMenuOpen(false);
+    clearAdminSession();
+    router.push('/admin-login');
   };
 
   return (
@@ -100,13 +130,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="hidden lg:block h-4 w-px bg-slate-200" />
 
-            <Link
-              href="/admin-login"
+            <button
+              type="button"
+              onClick={handleLogoutAdmin}
               className="hidden lg:inline-flex p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               title="Keluar dari Panel"
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
 
             {/* Tombol Hamburger untuk HP & Tablet */}
             <button
@@ -177,14 +208,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Store className="w-4 h-4 text-slate-400" />
                 <span>Mode Pedagang (Demo)</span>
               </button>
-              <Link
-                href="/admin-login"
-                onClick={() => setMobileMenuOpen(false)}
+              <button
+                type="button"
+                onClick={handleLogoutAdmin}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Keluar dari Panel</span>
-              </Link>
+              </button>
             </div>
           </aside>
         </div>
